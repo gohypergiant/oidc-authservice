@@ -7,7 +7,7 @@ on:
 jobs:
 
   ci:
-    name: CI
+    name: Build and Push
     runs-on: ubuntu-18.04
     steps:
       - name: Check out code
