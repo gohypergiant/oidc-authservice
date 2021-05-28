@@ -245,6 +245,12 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
+	logger.Infof("userID: %s \n", userID)
+	logger.Infof("userGroups: %v \n", groups)
+	logger.Infof("claims: %v \n", claims)
+	logger.Infof("rawIDToken: %s \n", rawIDToken)
+	logger.Infof("oauth2Tokens: %v \n", oauth2Tokens)
+
 	session.Values[userSessionUserID] = userID
 	session.Values[userSessionGroups] = groups
 	session.Values[userSessionClaims] = claims

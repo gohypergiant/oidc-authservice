@@ -7,7 +7,7 @@ else
 GIT_VERSION := $(shell git describe --tags --long --always)-dirty-$(shell git diff | shasum -a256 | cut -c -6)
 endif
 
-IMG ?= gcr.io/arrikto-playground/kubeflow/oidc-authservice
+IMG ?= hyperdrive-oidc-authservice
 TAG ?= $(GIT_VERSION)
 
 .EXPORT_ALL_VARIABLES:
@@ -31,6 +31,11 @@ docker-build:
 
 docker-push:
 	docker push $(IMG):$(TAG)
+
+import-local:
+	k3d image import --cluster hyperdrive-local $(IMG):latest
+
+deploy-local: docker-build import-local
 
 bin/plantuml.jar:
 	mkdir -p bin
