@@ -10,12 +10,12 @@ import (
 	"path"
 	"time"
 
+	"github.com/bmartel/boltstore/shared"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
-	"github.com/yosssi/boltstore/shared"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -187,6 +187,7 @@ func main() {
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators: []authenticator.Request{
+			hyperdriveAuthenticator,
 			sessionAuthenticator,
 			idTokenAuthenticator,
 			k8sAuthenticator,

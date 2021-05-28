@@ -1,10 +1,25 @@
 # OIDC AuthService
 
-This is a rewrite of the [ajmyyra/ambassador-auth-oidc](https://github.com/ajmyyra/ambassador-auth-oidc) project.
+This is a fork of the [arrikto/oidc-authservice](https://github.com/arrikto/oidc-authservice) project.
 
 An AuthService is an HTTP Server that an API Gateway (eg Ambassador, Envoy) asks if an incoming request is authorized.
 
 For more information, see [this article](https://journal.arrikto.com/kubeflow-authentication-with-istio-dex-5eafdfac4782).
+
+## Changes to this fork
+
+Supplies an additional layer above the underlying OpenID Connect operations to be able to create and verify an
+application specific token for consumption within trusted gateway.
+
+Ability to request and generate JWT for application specific scopes, and optionally call out for additional role info
+for a given authenticating user to bundle application roles into the JWT.
+
+Verifies first and foremost the JWT's generated securely within this service, falling back to the underlying OpenID
+Connect tokens for further verification.
+
+These changes allow for a traditional OIDC flow to continue to operate as normal, but supplement this information
+further application specifics (roles) to better serve the gateway AuthN/Z, and allow for verifiable intraservice communication
+with embedded longlived tokens.
 
 ## OpenID Connect
 
@@ -139,6 +154,12 @@ Can be used with:
 
 * Local: `make build`
 * Docker: `make docker-build`
+
+### Local Deploy 
+
+* Docker/K3d: `make deploy-local`
+* Also requires a reapply of a locally cloned hyperdrive-reference's kf folder if developing changes to this service
+* `cd /path/to/hyperdrive-reference && kubectl -k apply ./kf`
 
 # E2E Tests
 

@@ -245,6 +245,15 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
+	// TODO:
+	// - make a configurable call to get user roles by email here.
+	// - Store the applications roles in the session
+	// - Generate a jwt comprising the information in the incoming token from oidc to allow trusted cross communication
+	// - using scopes, adjust the exp of the application level jwt accordingly:
+	//		- openid: exp: <pulled from oidc token>
+	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 5 // 5 years
+	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 5 // 5 years
+
 	logger.Infof("userID: %s \n", userID)
 	logger.Infof("userGroups: %v \n", groups)
 	logger.Infof("claims: %v \n", claims)
