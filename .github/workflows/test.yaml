@@ -1,11 +1,8 @@
-name: Go
+name: Test
 
 on:
-  push:
   pull_request:
-    branches: [ master ]
-  schedule:
-    - cron: '0 0 * * *' # Run every day at 00:00 UTC.
+    branches: [ main ]
 
 jobs:
 

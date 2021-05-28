@@ -1,0 +1,54 @@
+name: Build and push
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+
+  ci:
+    name: CI
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Cache tools
+        id: cache-tools
+        uses: actions/cache@v1
+        with:
+          path: bin/deps
+          key: ${{ runner.os }}-${{ hashFiles('hack/binary_deps.py') }}
+
+      - name: Install binary deps
+        if: steps['cache-tools'].outputs['cache-hit'] != 'true'
+        run: make bin/deps
+
+      - name: Unit tests
+        run: make test
+
+      - name: E2E Test
+        run: make e2e
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Build, tag, and push image
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: hyperdrive-oidc-authservice
+        run: |
+          IMAGE_TAG=${GITHUB_REF##*/}-${GITHUB_SHA}-$(date +%s)
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f . 
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+      - name: Logout of Amazon ECR
+        if: always()
+        run: docker logout ${{ steps.login-ecr.outputs.registry }}
