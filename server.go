@@ -60,9 +60,10 @@ type jwtClaimOpts struct {
 // httpHeaderOpts specifies the location of the user's identity inside HTTP
 // headers.
 type httpHeaderOpts struct {
-	userIDHeader string
-	userIDPrefix string
-	groupsHeader string
+	userIDHeader      string
+	userIDTokenHeader string
+	userIDPrefix      string
+	groupsHeader      string
 }
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +229,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// User is authenticated, create new session.
 	session := sessions.NewSession(s.store, userSessionCookie)
+
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection

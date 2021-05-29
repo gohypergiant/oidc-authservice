@@ -85,11 +85,19 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		groups = []string{}
 	}
 
+	extra := map[string][]string{}
+	idToken, ok := session.Values[userSessionIDToken].(string)
+	if ok {
+		extra[userSessionIDToken] = []string{idToken}
+	}
+
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   session.Values[userSessionUserID].(string),
 			Groups: groups,
+			Extra:  extra,
 		},
 	}
+
 	return resp, true, nil
 }

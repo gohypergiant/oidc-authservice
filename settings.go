@@ -37,7 +37,7 @@ type config struct {
 
 	// IDToken
 	UserIDClaim       string `split_words:"true" default:"email" envconfig:"USERID_CLAIM"`
-	UserIDTokenHeader string `split_words:"true" envconfig:"USERID_TOKEN_HEADER"`
+	UserIDTokenHeader string `split_words:"true" default:"Authorization" envconfig:"USERID_TOKEN_HEADER"`
 	GroupsClaim       string `split_words:"true" default:"groups"`
 	IDTokenHeader     string `split_words:"true" default:"Authorization" envconfig:"ID_TOKEN_HEADER"`
 

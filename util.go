@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
@@ -156,6 +157,14 @@ func userInfoToHeaders(info user.Info, opts *httpHeaderOpts) map[string]string {
 	res := map[string]string{}
 	res[opts.userIDHeader] = opts.userIDPrefix + info.GetName()
 	res[opts.groupsHeader] = strings.Join(info.GetGroups(), ",")
+
+	extra := info.GetExtra()
+
+	idToken := extra[userSessionIDToken]
+	if idToken != nil {
+		res[opts.userIDTokenHeader] = fmt.Sprintf("Bearer %s", strings.Join(idToken, ""))
+	}
+
 	return res
 }
 

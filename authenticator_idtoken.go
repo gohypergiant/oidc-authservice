@@ -41,7 +41,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 		}
 	}
 
-	// Verifying received ID token
+	// Verifying received OIDC token
 	if err != nil {
 		verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
 		token, err := verifier.Verify(ctx, bearer)
@@ -70,10 +70,14 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 
 	// TODO: unpack roles here too?
 
+	extra := map[string][]string{}
+	extra[userSessionIDToken] = []string{bearer}
+
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   claims[s.userIDClaim].(string),
 			Groups: groups,
+			Extra:  extra,
 		},
 	}
 
