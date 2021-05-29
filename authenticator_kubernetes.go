@@ -3,7 +3,9 @@ package main
 import (
 	"net/http"
 	"strings"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/client-go/kubernetes"
@@ -24,6 +26,12 @@ func newKubernetesAuthenticator(c *rest.Config, aud []string) (authenticator.Req
 		Anonymous:               false,
 		TokenAccessReviewClient: kubernetes.NewForConfigOrDie(c).AuthenticationV1().TokenReviews(),
 		APIAudiences:            aud,
+		WebhookRetryBackoff: &wait.Backoff{
+			Duration: 500 * time.Millisecond,
+			Factor:   1.5,
+			Jitter:   0.2,
+			Steps:    5,
+		},
 	}
 	k8sAuthenticator, _, err := config.New()
 	return &kubernetesAuthenticator{audiences: aud, authenticator: k8sAuthenticator}, err

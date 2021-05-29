@@ -4,17 +4,18 @@ import (
 	"net/http"
 
 	oidc "github.com/coreos/go-oidc"
+	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type idTokenAuthenticator struct {
-	header      string // header name where id token is stored
-	caBundle    []byte
-	provider    *oidc.Provider
-	clientID    string // need client id to verify the id token
-	userIDClaim string // retrieve the userid if the claim exists
-	groupsClaim string
+	header       string // header name where id token is stored
+	caBundle     []byte
+	provider     *oidc.Provider
+	oauth2Config *oauth2.Config
+	userIDClaim  string // retrieve the userid if the claim exists
+	groupsClaim  string
 }
 
 func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
@@ -28,18 +29,31 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 
 	ctx := setTLSContext(r.Context(), s.caBundle)
 
-	// Verifying received ID token
-	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.clientID})
-	token, err := verifier.Verify(ctx, bearer)
-	if err != nil {
-		logger.Errorf("id-token verification failed: %v", err)
-		return nil, false, nil
+	var claims map[string]interface{}
+
+	// Check first for a valid exchanged id token
+	exchange := &jwtExchange{oauth2Config: s.oauth2Config}
+	exchangeClaims, err := exchange.verify(bearer)
+
+	if err == nil {
+		for k, v := range *exchangeClaims {
+			claims[k] = v
+		}
 	}
 
-	var claims map[string]interface{}
-	if err := token.Claims(&claims); err != nil {
-		logger.Errorf("retrieving user claims failed: %v", err)
-		return nil, false, nil
+	// Verifying received ID token
+	if err != nil {
+		verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
+		token, err := verifier.Verify(ctx, bearer)
+		if err != nil {
+			logger.Errorf("id-token verification failed: %v", err)
+			return nil, false, nil
+		}
+
+		if err = token.Claims(&claims); err != nil {
+			logger.Errorf("retrieving user claims failed: %v", err)
+			return nil, false, nil
+		}
 	}
 
 	if claims[s.userIDClaim] == nil {
@@ -54,11 +68,14 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
+	// TODO: unpack roles here too?
+
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   claims[s.userIDClaim].(string),
 			Groups: groups,
 		},
 	}
+
 	return resp, true, nil
 }

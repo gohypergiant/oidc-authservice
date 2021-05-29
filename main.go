@@ -51,6 +51,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, OIDCCallbackPath), s.callback).Methods(http.MethodGet)
 	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, SessionLogoutPath), s.logout).Methods(http.MethodPost)
+	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, TokenPath), s.token).Methods(http.MethodPost)
 
 	router.PathPrefix("/").Handler(whitelistMiddleware(c.SkipAuthURLs, isReady)(http.HandlerFunc(s.authenticate)))
 
@@ -155,12 +156,12 @@ func main() {
 	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
 
 	idTokenAuthenticator := &idTokenAuthenticator{
-		header:      c.IDTokenHeader,
-		caBundle:    caBundle,
-		provider:    provider,
-		clientID:    c.ClientID,
-		userIDClaim: c.UserIDClaim,
-		groupsClaim: c.GroupsClaim,
+		header:       c.IDTokenHeader,
+		caBundle:     caBundle,
+		provider:     provider,
+		oauth2Config: oauth2Config,
+		userIDClaim:  c.UserIDClaim,
+		groupsClaim:  c.GroupsClaim,
 	}
 
 	// Set the server values.
@@ -189,7 +190,6 @@ func main() {
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators: []authenticator.Request{
-			hyperdriveAuthenticator,
 			sessionAuthenticator,
 			idTokenAuthenticator,
 			k8sAuthenticator,

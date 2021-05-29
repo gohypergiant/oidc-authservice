@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -20,6 +21,7 @@ import (
 var (
 	OIDCCallbackPath  = "/oidc/callback"
 	SessionLogoutPath = "/logout"
+	TokenPath         = "/token"
 )
 
 func init() {
@@ -247,20 +249,23 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// TODO:
 	// - make a configurable call to get user roles by email here.
+	// roles := []string{}
+
 	// - Store the applications roles in the session
-	// - Generate a jwt comprising the information in the incoming token from oidc to allow trusted cross communication
+
+	// - Generate a jwt comprising the information in the incoming token from oidc and roles to allow trusted cross communication
 	// - using scopes, adjust the exp of the application level jwt accordingly:
 	//		- openid: exp: <pulled from oidc token>
 	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 5 // 5 years
 	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 5 // 5 years
 
-	exchangeToken = jwtExchange{oauth2Config: s.oauth2Config}
-	idToken, finalClaims := exchangeToken.sign(&claims)
+	exchange := jwtExchange{oauth2Config: s.oauth2Config}
+	idToken, finalClaims := exchange.sign(&claims, nil)
 
 	logger.Infof("userID: %s \n", userID)
 	logger.Infof("userGroups: %v \n", groups)
 	logger.Infof("finalClaims: %v \n", finalClaims)
-	logger.Infof("idToken: %s \n", rawIDToken)
+	logger.Infof("idToken: %s \n", idToken)
 	logger.Infof("oauth2Tokens: %v \n", oauth2Tokens)
 
 	session.Values[userSessionUserID] = userID
@@ -335,6 +340,49 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return 201 because the logout endpoint is still on the envoy-facing server,
 	// meaning that returning a 200 will result in the request being proxied upstream.
+	returnJSONMessage(w, http.StatusCreated, resp)
+}
+
+// token is the handler responsible for allowing json web token generation to take place
+func (s *server) token(w http.ResponseWriter, r *http.Request) {
+
+	logger := loggerForRequest(r)
+
+	// Only header auth allowed for this endpoint
+	sessionToken := getBearerToken(r.Header.Get(s.authHeader))
+	if sessionToken == "" {
+		logger.Errorf("Request doesn't have a session token in header '%s'", s.authHeader)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	exchange := jwtExchange{oauth2Config: s.oauth2Config}
+	existingClaims, err := exchange.verify(sessionToken)
+	if err != nil {
+		logger.Errorf("Request session token is invalid in header '%s'", s.authHeader)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	opts := struct {
+		Scopes *[]string `json:"scopes"`
+	}{}
+	err = decoder.Decode(&opts)
+	if err != nil {
+		returnMessage(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	newToken, _ := exchange.sign(existingClaims, opts.Scopes)
+	resp := struct {
+		Token string `json:"token"`
+	}{
+		Token: newToken,
+	}
+
 	returnJSONMessage(w, http.StatusCreated, resp)
 }
 

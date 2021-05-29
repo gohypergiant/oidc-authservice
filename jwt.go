@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strings"
 	"time"
 
@@ -8,7 +9,20 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func hasNonInteractiveScope(claims jwt.MapClaims) {
+func mapClaimsToInterface(mapClaims *jwt.MapClaims) *map[string]interface{} {
+
+	claims := map[string]interface{}{}
+
+	for k, v := range *mapClaims {
+		claims[k] = v
+	}
+
+	return &claims
+}
+
+func hasNonInteractiveScope(mapClaims *jwt.MapClaims) bool {
+
+	claims := *mapClaims
 
 	scopesClaim := claims["scopes"]
 
@@ -31,7 +45,7 @@ type jwtExchange struct {
 	oauth2Config *oauth2.Config
 }
 
-func (j *jwtExchange) sign(externalClaims *map[string]interface{}) (string, *map[string]interface{}) {
+func (j *jwtExchange) sign(externalClaims *map[string]interface{}, scopes *[]string) (string, *map[string]interface{}) {
 
 	// Create jwt
 	token := jwt.New(jwt.SigningMethodHS256)
@@ -44,6 +58,10 @@ func (j *jwtExchange) sign(externalClaims *map[string]interface{}) (string, *map
 		}
 	}
 
+	if scopes != nil {
+		claims["scopes"] = *scopes
+	}
+
 	// NOTE: these should be set by the caller, retrieved from the valid oidc token
 	// claims["iss"] = issuerID
 	// claims["aud"] = audience
@@ -53,23 +71,29 @@ func (j *jwtExchange) sign(externalClaims *map[string]interface{}) (string, *map
 	now := time.Now()
 	claims["iat"] = now.Unix()
 
-	if hasNonInteractiveScope(claims) {
+	if hasNonInteractiveScope(&claims) {
 		claims["exp"] = now.AddDate(5, 0, 0).Unix() // 5 years for sdk tokens
 	} else {
 		claims["exp"] = now.AddDate(0, 0, 1).Unix() // 1 day for standard tokens
 	}
 
+	signed, err := token.SignedString([]byte(j.oauth2Config.ClientSecret))
+	if err != nil {
+		log.Println(err.Error())
+		return "", nil
+	}
+
 	// Sign the token string
-	return token.SignedString(j.oauth2Config.ClientSecret), &claims
+	return signed, mapClaimsToInterface(&claims)
 }
 
-func (j *jwtExchange) verify(token string) (*jwt.MapClaims, error) {
+func (j *jwtExchange) verify(token string) (*map[string]interface{}, error) {
 
 	claims := new(jwt.MapClaims)
 
-	_, err = jwt.ParseWithClaims(token, claims, func(_token *jwt.Token) (interface{}, error) {
-		return j.oauth2Config.ClientSecret, nil
+	_, err := jwt.ParseWithClaims(token, claims, func(_token *jwt.Token) (interface{}, error) {
+		return []byte(j.oauth2Config.ClientSecret), nil
 	})
 
-	return claims, err
+	return mapClaimsToInterface(claims), err
 }
