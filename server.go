@@ -254,17 +254,21 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 5 // 5 years
 	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 5 // 5 years
 
+	exchangeToken = jwtExchange{oauth2Config: s.oauth2Config}
+	idToken, finalClaims := exchangeToken.sign(&claims)
+
 	logger.Infof("userID: %s \n", userID)
 	logger.Infof("userGroups: %v \n", groups)
-	logger.Infof("claims: %v \n", claims)
-	logger.Infof("rawIDToken: %s \n", rawIDToken)
+	logger.Infof("finalClaims: %v \n", finalClaims)
+	logger.Infof("idToken: %s \n", rawIDToken)
 	logger.Infof("oauth2Tokens: %v \n", oauth2Tokens)
 
 	session.Values[userSessionUserID] = userID
 	session.Values[userSessionGroups] = groups
-	session.Values[userSessionClaims] = claims
-	session.Values[userSessionIDToken] = rawIDToken
+	session.Values[userSessionClaims] = *finalClaims
+	session.Values[userSessionIDToken] = idToken
 	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
+
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Error creating user session")
