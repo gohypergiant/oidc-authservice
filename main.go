@@ -26,6 +26,8 @@ const secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
 
 func main() {
 
+	log.Info("Hyperdrive authservice ready for ignition")
+
 	c, err := parseConfig()
 	if err != nil {
 		log.Fatalf("Failed to parse configuration: %+v", err)
