@@ -29,7 +29,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 
 	ctx := setTLSContext(r.Context(), s.caBundle)
 
-	var claims map[string]interface{}
+	claims := map[string]interface{}{}
 
 	// Check first for a valid exchanged id token
 	exchange := &jwtExchange{oauth2Config: s.oauth2Config}
