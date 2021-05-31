@@ -46,6 +46,7 @@ type server struct {
 	strictSessionValidation bool
 	authHeader              string
 	idTokenOpts             jwtClaimOpts
+	idTokenAudience         string
 	upstreamHTTPHeaderOpts  httpHeaderOpts
 	caBundle                []byte
 	sessionSameSite         http.SameSite
@@ -269,6 +270,9 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 			logger.Infof("Roles: %s", *roles)
 			claims["roles"] = *roles
 		}
+	}
+	if s.idTokenAudience != "" {
+		claims["aud"] = s.idTokenAudience
 	}
 
 	exchange := jwtExchange{oauth2Config: s.oauth2Config}

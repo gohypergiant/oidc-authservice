@@ -177,6 +177,7 @@ func main() {
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
+		idTokenAudience:        c.IDTokenAudience,
 		idTokenOpts: jwtClaimOpts{
 			userIDClaim: c.UserIDClaim,
 			groupsClaim: c.GroupsClaim,

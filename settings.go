@@ -41,6 +41,7 @@ type config struct {
 	UserIDTokenHeader string `split_words:"true" default:"x-id-token" envconfig:"USERID_TOKEN_HEADER"`
 	GroupsClaim       string `split_words:"true" default:"groups"`
 	IDTokenHeader     string `split_words:"true" default:"Authorization" envconfig:"ID_TOKEN_HEADER"`
+	IDTokenAudience   string `split_words:"true" default:"kubeflow-oidc-authservice" envconfig:"ID_TOKEN_AUDIENCE"`
 
 	// Infra
 	Hostname           string `split_words:"true" envconfig:"SERVER_HOSTNAME"`
