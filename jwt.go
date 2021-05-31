@@ -28,7 +28,7 @@ func hasNonInteractiveScope(mapClaims *jwt.MapClaims) bool {
 
 	if scopesClaim != nil {
 
-		scopes := interfaceSliceToStringSlice(scopesClaim.([]interface{}))
+		scopes := scopesClaim.([]string)
 
 		for _, scope := range scopes {
 

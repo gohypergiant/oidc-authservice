@@ -271,7 +271,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exchange := jwtExchange{oauth2Config: s.oauth2Config}
-	idToken, finalClaims := exchange.sign(&claims, nil)
+	idToken, finalClaims := exchange.sign(&claims, &[]string{"openid"})
 
 	logger.Infof("userID: %s \n", userID)
 	logger.Infof("userGroups: %v \n", groups)
