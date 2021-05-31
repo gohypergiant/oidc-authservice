@@ -299,7 +299,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		destination = s.afterLoginRedirectURL
 	}
 
-	http.Redirect(w, r, destination, http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("%s#token=%s", destination, idToken), http.StatusFound)
 }
 
 // logout is the handler responsible for revoking the user's session.
