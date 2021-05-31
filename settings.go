@@ -23,6 +23,7 @@ type config struct {
 
 	// General
 	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`
+	RolesServiceUrl      *url.URL `split_words:"true" envconfig:"ROLES_SERVICE_URL"`
 	SkipAuthURLs         []string `split_words:"true" envconfig:"SKIP_AUTH_URLS"`
 	AuthHeader           string   `split_words:"true" default:"Authorization"`
 	Audiences            []string `default:"istio-ingressgateway.istio-system.svc.cluster.local"`

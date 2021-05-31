@@ -38,6 +38,7 @@ type server struct {
 	oidcStateStore          sessions.Store
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer
+	rolesServiceUrl         string
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
@@ -260,6 +261,14 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	//		- openid: exp: <pulled from oidc token>
 	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 5 // 5 years
 	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 5 // 5 years
+
+	email, ok := claims["email"].(string)
+	if s.rolesServiceUrl != "" && ok {
+		roles := getRolesByEmail(s.rolesServiceUrl, email)
+		if roles != nil {
+			claims["roles"] = *roles
+		}
+	}
 
 	exchange := jwtExchange{oauth2Config: s.oauth2Config}
 	idToken, finalClaims := exchange.sign(&claims, nil)
