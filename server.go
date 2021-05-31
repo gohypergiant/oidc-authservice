@@ -266,6 +266,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	if s.rolesServiceUrl != "" && ok {
 		roles := getRolesByEmail(s.rolesServiceUrl, email)
 		if roles != nil {
+			logger.Infof("Roles: %s", *roles)
 			claims["roles"] = *roles
 		}
 	}
