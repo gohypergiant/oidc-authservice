@@ -71,8 +71,9 @@ func (j *jwtExchange) sign(externalClaims *map[string]interface{}, scopes *[]str
 	now := time.Now()
 	claims["iat"] = now.Unix()
 
+	// Generate an appropriate expiry for this token
 	if hasNonInteractiveScope(&claims) {
-		claims["exp"] = now.AddDate(5, 0, 0).Unix() // 5 years for sdk tokens
+		claims["exp"] = now.AddDate(5, 0, 0).Unix() // 5 years for non interactive (sdk) tokens
 	} else {
 		claims["exp"] = now.AddDate(0, 0, 1).Unix() // 1 day for standard tokens
 	}

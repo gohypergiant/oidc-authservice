@@ -387,6 +387,8 @@ func (s *server) token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: role check for authorized generation of any token with alternate scopes, ex. sdk_development,sdk_production
+
 	newToken, _ := exchange.sign(existingClaims, opts.Scopes)
 	resp := struct {
 		Token string `json:"token"`

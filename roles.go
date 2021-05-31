@@ -19,7 +19,7 @@ func getRolesByEmail(svcUrl string, email string) *Roles {
 
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	defer r.Body.Close()
 
