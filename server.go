@@ -398,6 +398,14 @@ func (s *server) token(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: role check for authorized generation of any token with alternate scopes, ex. sdk_development,sdk_production
 
+	// Check is a valid scope set
+	for _, scope := range *opts.Scopes {
+		if !existsInSlice(scope, ValidScopes) {
+			returnMessage(w, http.StatusBadRequest, fmt.Sprintf("'%s' is not a valid scope", scope))
+			return
+		}
+	}
+
 	newToken, _ := exchange.sign(existingClaims, opts.Scopes)
 	resp := struct {
 		Token string `json:"token"`
