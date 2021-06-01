@@ -282,12 +282,6 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	idToken, finalClaims := exchange.sign(&claims, &[]string{ScopeOpenID})
 
-	logger.Infof("userID: %s \n", userID)
-	logger.Infof("userGroups: %v \n", groups)
-	logger.Infof("finalClaims: %v \n", finalClaims)
-	logger.Infof("idToken: %s \n", idToken)
-	logger.Infof("oauth2Tokens: %v \n", oauth2Tokens)
-
 	session.Values[userSessionUserID] = userID
 	session.Values[userSessionGroups] = groups
 	session.Values[userSessionClaims] = *finalClaims
