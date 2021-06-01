@@ -251,21 +251,26 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
-	// TODO:
-	// - make a configurable call to get user roles by email here.
-	// roles := []string{}
-
-	// - Store the applications roles in the session
-
 	// - Generate a jwt comprising the information in the incoming token from oidc and roles to allow trusted cross communication
 	// - using scopes, adjust the exp of the application level jwt accordingly:
 	//		- openid: exp: <pulled from oidc token>
+	//		- service: exp: 60 * 60 * 24 * 365 * 10 // 10 years
 	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 5 // 5 years
 	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 5 // 5 years
 
+	exchange := jwtExchange{oauth2Config: s.oauth2Config}
+
 	email, ok := claims["email"].(string)
 	if s.rolesServiceUrl != "" && ok {
-		roles := getRolesByEmail(s.rolesServiceUrl, email)
+
+		serviceClaims := copyMap(claims)
+		// TODO: not sure what role would be required here? We should check the scope of the token maybe instead for these
+		// internal service scoped requests
+		serviceClaims["roles"] = []string{}
+
+		serviceToken, _ := exchange.sign(&serviceClaims, &[]string{ScopeService})
+
+		roles := getRolesByEmail(s.rolesServiceUrl, s.upstreamHTTPHeaderOpts.userIDTokenHeader, serviceToken, email)
 		if roles != nil {
 			logger.Infof("Roles: %s", *roles)
 			claims["roles"] = *roles
@@ -275,8 +280,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		claims["aud"] = s.idTokenAudience
 	}
 
-	exchange := jwtExchange{oauth2Config: s.oauth2Config}
-	idToken, finalClaims := exchange.sign(&claims, &[]string{"openid"})
+	idToken, finalClaims := exchange.sign(&claims, &[]string{ScopeOpenID})
 
 	logger.Infof("userID: %s \n", userID)
 	logger.Infof("userGroups: %v \n", groups)

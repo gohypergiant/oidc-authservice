@@ -30,12 +30,17 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 	ctx := setTLSContext(r.Context(), s.caBundle)
 
 	claims := map[string]interface{}{}
+	extra := map[string][]string{}
 
 	// Check first for a valid exchanged id token
 	exchange := &jwtExchange{oauth2Config: s.oauth2Config}
 	exchangeClaims, err := exchange.verify(bearer)
 
 	if err == nil {
+		// roles/scopes are available here, keep a record of the bearer token
+		extra[userSessionIDToken] = []string{bearer}
+
+		// copy the claims over from the oidc token coming from IDP
 		for k, v := range *exchangeClaims {
 			claims[k] = v
 		}
@@ -67,11 +72,6 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 	if groupsClaim != nil {
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
-
-	// TODO: unpack roles here too?
-
-	extra := map[string][]string{}
-	extra[userSessionIDToken] = []string{bearer}
 
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{

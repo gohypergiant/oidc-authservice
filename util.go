@@ -179,3 +179,20 @@ func interfaceSliceToStringSlice(in []interface{}) []string {
 	}
 	return res
 }
+
+func existsInSlice(elem string, slice []string) bool {
+	for _, s := range slice {
+		if elem == s {
+			return true
+		}
+	}
+	return false
+}
+
+func copyMap(in map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}

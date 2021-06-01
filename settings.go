@@ -88,7 +88,7 @@ func parseConfig() (*config, error) {
 	c.SkipAuthURLs = ensureInSlice(c.AuthserviceURLPrefix.Path, c.SkipAuthURLs)
 
 	c.OIDCScopes = trimSpaceFromStringSliceElements(c.OIDCScopes)
-	c.OIDCScopes = ensureInSlice("openid", c.OIDCScopes)
+	c.OIDCScopes = ensureInSlice(ScopeOpenID, c.OIDCScopes)
 
 	c.TemplatePath = trimSpaceFromStringSliceElements(c.TemplatePath)
 	c.TemplatePath = ensureInSlice("web/templates/default", c.TemplatePath)
@@ -120,10 +120,8 @@ func trimSpaceFromStringSliceElements(slice []string) []string {
 }
 
 func ensureInSlice(elem string, slice []string) []string {
-	for _, s := range slice {
-		if elem == s {
-			return slice
-		}
+	if existsInSlice(elem, slice) {
+		return slice
 	}
 	slice = append([]string{elem}, slice...)
 	return slice
