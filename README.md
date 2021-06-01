@@ -18,7 +18,7 @@ Verifies first and foremost the JWT's generated securely within this service, fa
 Connect tokens for further verification.
 
 These changes allow for a traditional OIDC flow to continue to operate as normal, but supplement this information
-further application specifics (roles) to better serve the gateway AuthN/Z, and allow for verifiable intraservice communication
+further with application specifics (roles/scopes) to better serve the gateway AuthN/Z, and allow for verifiable intraservice communication
 with embedded longlived tokens.
 
 ## OpenID Connect
