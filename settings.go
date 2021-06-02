@@ -22,14 +22,14 @@ type config struct {
 	OIDCStateStorePath      string   `split_words:"true" default:"/var/lib/authservice/data.db"`
 
 	// General
-	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`
-	RolesServiceUrl      *url.URL `split_words:"true" envconfig:"ROLES_SERVICE_URL"`
-	SkipAuthURLs         []string `split_words:"true" envconfig:"SKIP_AUTH_URLS"`
-	AuthHeader           string   `split_words:"true" default:"Authorization"`
-	Audiences            []string `default:"istio-ingressgateway.istio-system.svc.cluster.local"`
-	HomepageURL          *url.URL `split_words:"true"`
-	AfterLoginURL        *url.URL `split_words:"true"`
-	AfterLogoutURL       *url.URL `split_words:"true"`
+	AuthserviceURLPrefix  *url.URL `required:"true" split_words:"true"`
+	AppIdentityServiceUrl *url.URL `split_words:"true" envconfig:"APP_IDENTITY_SERVICE_URL"`
+	SkipAuthURLs          []string `split_words:"true" envconfig:"SKIP_AUTH_URLS"`
+	AuthHeader            string   `split_words:"true" default:"Authorization"`
+	Audiences             []string `default:"istio-ingressgateway.istio-system.svc.cluster.local"`
+	HomepageURL           *url.URL `split_words:"true"`
+	AfterLoginURL         *url.URL `split_words:"true"`
+	AfterLogoutURL        *url.URL `split_words:"true"`
 
 	// Identity Headers
 	UserIDHeader string `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`

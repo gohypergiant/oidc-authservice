@@ -38,7 +38,7 @@ type server struct {
 	oidcStateStore          sessions.Store
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer
-	rolesServiceUrl         string
+	appIdentityServiceUrl   string
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
@@ -261,7 +261,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	exchange := jwtExchange{oauth2Config: s.oauth2Config}
 
 	email, ok := claims["email"].(string)
-	if s.rolesServiceUrl != "" && ok {
+	if s.appIdentityServiceUrl != "" && ok {
 
 		serviceClaims := copyMap(claims)
 		// TODO: not sure what role would be required here? We should check the scope of the token maybe instead for these
@@ -270,10 +270,13 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 		serviceToken, _ := exchange.sign(&serviceClaims, &[]string{ScopeService})
 
-		roles := getRolesByEmail(s.rolesServiceUrl, s.upstreamHTTPHeaderOpts.userIDTokenHeader, serviceToken, email)
-		if roles != nil {
-			logger.Infof("Roles: %s", *roles)
-			claims["roles"] = *roles
+		identity := getIdentityByEmail(s.appIdentityServiceUrl, s.upstreamHTTPHeaderOpts.userIDTokenHeader, serviceToken, email)
+		if identity != nil {
+			appIdentity := *identity
+
+			logger.Infof("Identity: %s", appIdentity)
+			claims["sub"] = appIdentity.ID
+			claims["roles"] = appIdentity.Roles
 		}
 	}
 	if s.idTokenAudience != "" {
