@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/bmartel/boltstore/reaper"
+	boltstore "github.com/bmartel/boltstore/store"
 	"github.com/boltdb/bolt"
 	"github.com/coreos/go-oidc"
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/yosssi/boltstore/reaper"
-	boltstore "github.com/yosssi/boltstore/store"
 	"golang.org/x/oauth2"
 )
 

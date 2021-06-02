@@ -4,17 +4,18 @@ import (
 	"net/http"
 
 	oidc "github.com/coreos/go-oidc"
+	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type idTokenAuthenticator struct {
-	header      string // header name where id token is stored
-	caBundle    []byte
-	provider    *oidc.Provider
-	clientID    string // need client id to verify the id token
-	userIDClaim string // retrieve the userid if the claim exists
-	groupsClaim string
+	header       string // header name where id token is stored
+	caBundle     []byte
+	provider     *oidc.Provider
+	oauth2Config *oauth2.Config
+	userIDClaim  string // retrieve the userid if the claim exists
+	groupsClaim  string
 }
 
 func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
@@ -28,18 +29,36 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 
 	ctx := setTLSContext(r.Context(), s.caBundle)
 
-	// Verifying received ID token
-	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.clientID})
-	token, err := verifier.Verify(ctx, bearer)
-	if err != nil {
-		logger.Errorf("id-token verification failed: %v", err)
-		return nil, false, nil
+	claims := map[string]interface{}{}
+	extra := map[string][]string{}
+
+	// Check first for a valid exchanged id token
+	exchange := &jwtExchange{oauth2Config: s.oauth2Config}
+	exchangeClaims, err := exchange.verify(bearer)
+
+	if err == nil {
+		// roles/scopes are available here, keep a record of the bearer token
+		extra[userSessionIDToken] = []string{bearer}
+
+		// copy the claims over from the oidc token coming from IDP
+		for k, v := range *exchangeClaims {
+			claims[k] = v
+		}
 	}
 
-	var claims map[string]interface{}
-	if err := token.Claims(&claims); err != nil {
-		logger.Errorf("retrieving user claims failed: %v", err)
-		return nil, false, nil
+	// Verifying received OIDC token
+	if err != nil {
+		verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
+		token, err := verifier.Verify(ctx, bearer)
+		if err != nil {
+			logger.Errorf("id-token verification failed: %v", err)
+			return nil, false, nil
+		}
+
+		if err = token.Claims(&claims); err != nil {
+			logger.Errorf("retrieving user claims failed: %v", err)
+			return nil, false, nil
+		}
 	}
 
 	if claims[s.userIDClaim] == nil {
@@ -58,7 +77,9 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 		User: &user.DefaultInfo{
 			Name:   claims[s.userIDClaim].(string),
 			Groups: groups,
+			Extra:  extra,
 		},
 	}
+
 	return resp, true, nil
 }

@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -20,6 +21,7 @@ import (
 var (
 	OIDCCallbackPath  = "/oidc/callback"
 	SessionLogoutPath = "/logout"
+	TokenPath         = "/token"
 )
 
 func init() {
@@ -36,6 +38,7 @@ type server struct {
 	oidcStateStore          sessions.Store
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer
+	rolesServiceUrl         string
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
@@ -43,6 +46,7 @@ type server struct {
 	strictSessionValidation bool
 	authHeader              string
 	idTokenOpts             jwtClaimOpts
+	idTokenAudience         string
 	upstreamHTTPHeaderOpts  httpHeaderOpts
 	caBundle                []byte
 	sessionSameSite         http.SameSite
@@ -58,9 +62,10 @@ type jwtClaimOpts struct {
 // httpHeaderOpts specifies the location of the user's identity inside HTTP
 // headers.
 type httpHeaderOpts struct {
-	userIDHeader string
-	userIDPrefix string
-	groupsHeader string
+	userIDHeader      string
+	userIDTokenHeader string
+	userIDPrefix      string
+	groupsHeader      string
 }
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +231,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// User is authenticated, create new session.
 	session := sessions.NewSession(s.store, userSessionCookie)
+
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
@@ -245,11 +251,43 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
+	// - Generate a jwt comprising the information in the incoming token from oidc and roles to allow trusted cross communication
+	// - using scopes, adjust the exp of the application level jwt accordingly:
+	//		- openid: exp: <pulled from oidc token>
+	//		- service: exp: 60 * 60 * 24 * 365 * 10 // 10 years
+	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 5 // 5 years
+	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 5 // 5 years
+
+	exchange := jwtExchange{oauth2Config: s.oauth2Config}
+
+	email, ok := claims["email"].(string)
+	if s.rolesServiceUrl != "" && ok {
+
+		serviceClaims := copyMap(claims)
+		// TODO: not sure what role would be required here? We should check the scope of the token maybe instead for these
+		// internal service scoped requests
+		serviceClaims["roles"] = []string{}
+
+		serviceToken, _ := exchange.sign(&serviceClaims, &[]string{ScopeService})
+
+		roles := getRolesByEmail(s.rolesServiceUrl, s.upstreamHTTPHeaderOpts.userIDTokenHeader, serviceToken, email)
+		if roles != nil {
+			logger.Infof("Roles: %s", *roles)
+			claims["roles"] = *roles
+		}
+	}
+	if s.idTokenAudience != "" {
+		claims["aud"] = s.idTokenAudience
+	}
+
+	idToken, finalClaims := exchange.sign(&claims, &[]string{ScopeOpenID})
+
 	session.Values[userSessionUserID] = userID
 	session.Values[userSessionGroups] = groups
-	session.Values[userSessionClaims] = claims
-	session.Values[userSessionIDToken] = rawIDToken
+	session.Values[userSessionClaims] = *finalClaims
+	session.Values[userSessionIDToken] = idToken
 	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
+
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Error creating user session")
@@ -264,7 +302,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		destination = s.afterLoginRedirectURL
 	}
 
-	http.Redirect(w, r, destination, http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("%s#token=%s", destination, idToken), http.StatusFound)
 }
 
 // logout is the handler responsible for revoking the user's session.
@@ -316,6 +354,59 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return 201 because the logout endpoint is still on the envoy-facing server,
 	// meaning that returning a 200 will result in the request being proxied upstream.
+	returnJSONMessage(w, http.StatusCreated, resp)
+}
+
+// token is the handler responsible for allowing json web token generation to take place
+func (s *server) token(w http.ResponseWriter, r *http.Request) {
+
+	logger := loggerForRequest(r)
+
+	// Only header auth allowed for this endpoint
+	sessionToken := getBearerToken(r.Header.Get(s.authHeader))
+	if sessionToken == "" {
+		logger.Errorf("Request doesn't have a session token in header '%s'", s.authHeader)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	exchange := jwtExchange{oauth2Config: s.oauth2Config}
+	existingClaims, err := exchange.verify(sessionToken)
+	if err != nil {
+		logger.Errorf("Request session token is invalid in header '%s'", s.authHeader)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	opts := struct {
+		Scopes *[]string `json:"scopes"`
+	}{}
+	err = decoder.Decode(&opts)
+	if err != nil {
+		returnMessage(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// TODO: role check for authorized generation of any token with alternate scopes, ex. sdk_development,sdk_production
+
+	// Check is a valid scope set
+	for _, scope := range *opts.Scopes {
+		if !existsInSlice(scope, ValidScopes) {
+			returnMessage(w, http.StatusBadRequest, fmt.Sprintf("'%s' is not a valid scope", scope))
+			return
+		}
+	}
+
+	newToken, _ := exchange.sign(existingClaims, opts.Scopes)
+	resp := struct {
+		Token string `json:"token"`
+	}{
+		Token: newToken,
+	}
+
 	returnJSONMessage(w, http.StatusCreated, resp)
 }
 

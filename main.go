@@ -10,12 +10,12 @@ import (
 	"path"
 	"time"
 
+	"github.com/bmartel/boltstore/shared"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
-	"github.com/yosssi/boltstore/shared"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -51,6 +51,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, OIDCCallbackPath), s.callback).Methods(http.MethodGet)
 	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, SessionLogoutPath), s.logout).Methods(http.MethodPost)
+	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, TokenPath), s.token).Methods(http.MethodPost)
 
 	router.PathPrefix("/").Handler(whitelistMiddleware(c.SkipAuthURLs, isReady)(http.HandlerFunc(s.authenticate)))
 
@@ -155,12 +156,12 @@ func main() {
 	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
 
 	idTokenAuthenticator := &idTokenAuthenticator{
-		header:      c.IDTokenHeader,
-		caBundle:    caBundle,
-		provider:    provider,
-		clientID:    c.ClientID,
-		userIDClaim: c.UserIDClaim,
-		groupsClaim: c.GroupsClaim,
+		header:       c.IDTokenHeader,
+		caBundle:     caBundle,
+		provider:     provider,
+		oauth2Config: oauth2Config,
+		userIDClaim:  c.UserIDClaim,
+		groupsClaim:  c.GroupsClaim,
 	}
 
 	// Set the server values.
@@ -172,17 +173,20 @@ func main() {
 		// TODO: Add support for Redis
 		store:                  store,
 		oidcStateStore:         oidcStateStore,
+		rolesServiceUrl:        c.RolesServiceUrl.String(),
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
+		idTokenAudience:        c.IDTokenAudience,
 		idTokenOpts: jwtClaimOpts{
 			userIDClaim: c.UserIDClaim,
 			groupsClaim: c.GroupsClaim,
 		},
 		upstreamHTTPHeaderOpts: httpHeaderOpts{
-			userIDHeader: c.UserIDHeader,
-			userIDPrefix: c.UserIDPrefix,
-			groupsHeader: c.GroupsHeader,
+			userIDHeader:      c.UserIDHeader,
+			userIDTokenHeader: c.UserIDTokenHeader,
+			userIDPrefix:      c.UserIDPrefix,
+			groupsHeader:      c.GroupsHeader,
 		},
 		sessionMaxAgeSeconds:    c.SessionMaxAge,
 		strictSessionValidation: c.StrictSessionValidation,

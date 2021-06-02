@@ -23,6 +23,7 @@ type config struct {
 
 	// General
 	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`
+	RolesServiceUrl      *url.URL `split_words:"true" envconfig:"ROLES_SERVICE_URL"`
 	SkipAuthURLs         []string `split_words:"true" envconfig:"SKIP_AUTH_URLS"`
 	AuthHeader           string   `split_words:"true" default:"Authorization"`
 	Audiences            []string `default:"istio-ingressgateway.istio-system.svc.cluster.local"`
@@ -37,9 +38,10 @@ type config struct {
 
 	// IDToken
 	UserIDClaim       string `split_words:"true" default:"email" envconfig:"USERID_CLAIM"`
-	UserIDTokenHeader string `split_words:"true" envconfig:"USERID_TOKEN_HEADER"`
+	UserIDTokenHeader string `split_words:"true" default:"x-id-token" envconfig:"USERID_TOKEN_HEADER"`
 	GroupsClaim       string `split_words:"true" default:"groups"`
 	IDTokenHeader     string `split_words:"true" default:"Authorization" envconfig:"ID_TOKEN_HEADER"`
+	IDTokenAudience   string `split_words:"true" default:"kubeflow-oidc-authservice" envconfig:"ID_TOKEN_AUDIENCE"`
 
 	// Infra
 	Hostname           string `split_words:"true" envconfig:"SERVER_HOSTNAME"`
@@ -86,7 +88,7 @@ func parseConfig() (*config, error) {
 	c.SkipAuthURLs = ensureInSlice(c.AuthserviceURLPrefix.Path, c.SkipAuthURLs)
 
 	c.OIDCScopes = trimSpaceFromStringSliceElements(c.OIDCScopes)
-	c.OIDCScopes = ensureInSlice("openid", c.OIDCScopes)
+	c.OIDCScopes = ensureInSlice(ScopeOpenID, c.OIDCScopes)
 
 	c.TemplatePath = trimSpaceFromStringSliceElements(c.TemplatePath)
 	c.TemplatePath = ensureInSlice("web/templates/default", c.TemplatePath)
@@ -118,10 +120,8 @@ func trimSpaceFromStringSliceElements(slice []string) []string {
 }
 
 func ensureInSlice(elem string, slice []string) []string {
-	for _, s := range slice {
-		if elem == s {
-			return slice
-		}
+	if existsInSlice(elem, slice) {
+		return slice
 	}
 	slice = append([]string{elem}, slice...)
 	return slice

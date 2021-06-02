@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
@@ -156,6 +157,14 @@ func userInfoToHeaders(info user.Info, opts *httpHeaderOpts) map[string]string {
 	res := map[string]string{}
 	res[opts.userIDHeader] = opts.userIDPrefix + info.GetName()
 	res[opts.groupsHeader] = strings.Join(info.GetGroups(), ",")
+
+	extra := info.GetExtra()
+
+	idToken := extra[userSessionIDToken]
+	if idToken != nil {
+		res[opts.userIDTokenHeader] = fmt.Sprintf("Bearer %s", strings.Join(idToken, ""))
+	}
+
 	return res
 }
 
@@ -169,4 +178,21 @@ func interfaceSliceToStringSlice(in []interface{}) []string {
 		res = append(res, elem.(string))
 	}
 	return res
+}
+
+func existsInSlice(elem string, slice []string) bool {
+	for _, s := range slice {
+		if elem == s {
+			return true
+		}
+	}
+	return false
+}
+
+func copyMap(in map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
