@@ -10,7 +10,14 @@ import (
 
 type Roles = []string
 
-func getRolesByEmail(svcUrl string, serviceToken string, idTokenHeader string, email string) *Roles {
+type Identity struct {
+	ID        string `json:"id"`
+	Roles     Roles  `json:"roles"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+func getIdentityByEmail(svcUrl string, serviceToken string, idTokenHeader string, email string) *Identity {
 	svcByteString := []byte(svcUrl)
 	url := fmt.Sprintf("%s/%s", bytes.TrimRight(svcByteString, "/"), email)
 
@@ -25,8 +32,8 @@ func getRolesByEmail(svcUrl string, serviceToken string, idTokenHeader string, e
 	}
 	defer r.Body.Close()
 
-	roles := new(Roles)
-	json.NewDecoder(r.Body).Decode(roles)
+	identity := new(Identity)
+	json.NewDecoder(r.Body).Decode(identity)
 
-	return roles
+	return identity
 }

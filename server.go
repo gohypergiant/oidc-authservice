@@ -38,7 +38,7 @@ type server struct {
 	oidcStateStore          sessions.Store
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer
-	rolesServiceUrl         string
+	appIdentityServiceUrl   string
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
@@ -254,14 +254,14 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	// - Generate a jwt comprising the information in the incoming token from oidc and roles to allow trusted cross communication
 	// - using scopes, adjust the exp of the application level jwt accordingly:
 	//		- openid: exp: <pulled from oidc token>
-	//		- service: exp: 60 * 60 * 24 * 365 * 10 // 10 years
-	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 5 // 5 years
-	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 5 // 5 years
+	//		- service: exp: 60 * 60 * 24 * 365 * 99 // 99 years
+	//		- sdk_development: exp: 60 * 60 * 24 * 365 * 99 // 99 years
+	//		- sdk_production: exp: 60 * 60 * 24 * 365 * 99 // 99 years
 
 	exchange := jwtExchange{oauth2Config: s.oauth2Config}
 
 	email, ok := claims["email"].(string)
-	if s.rolesServiceUrl != "" && ok {
+	if s.appIdentityServiceUrl != "" && ok {
 
 		serviceClaims := copyMap(claims)
 		// TODO: not sure what role would be required here? We should check the scope of the token maybe instead for these
@@ -270,11 +270,23 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 		serviceToken, _ := exchange.sign(&serviceClaims, &[]string{ScopeService})
 
-		roles := getRolesByEmail(s.rolesServiceUrl, s.upstreamHTTPHeaderOpts.userIDTokenHeader, serviceToken, email)
-		if roles != nil {
-			logger.Infof("Roles: %s", *roles)
-			claims["roles"] = *roles
+		identity := getIdentityByEmail(s.appIdentityServiceUrl, s.upstreamHTTPHeaderOpts.userIDTokenHeader, serviceToken, email)
+		// no identity found or error in retrieving the identity from IAM service
+		if identity == nil {
+			// TODO: look into options for making this flow more friendly.
+			returnMessage(w, http.StatusInternalServerError, "Error retrieving user identity")
+			return
 		}
+
+		appIdentity := *identity
+
+		logger.Infof("Identity: %s", appIdentity)
+		// NOTE: may as well keep a reference to the idp's sub value in case this is ever required later
+		claims["externalSub"] = claims["sub"]
+		claims["sub"] = appIdentity.ID
+		claims["roles"] = appIdentity.Roles
+		claims["firstName"] = appIdentity.FirstName
+		claims["lastName"] = appIdentity.LastName
 	}
 	if s.idTokenAudience != "" {
 		claims["aud"] = s.idTokenAudience
