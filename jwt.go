@@ -9,6 +9,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// mapClaimsToInterface takes a jwt claimset and copies the values to a generic map
 func mapClaimsToInterface(mapClaims *jwt.MapClaims) *map[string]interface{} {
 
 	claims := map[string]interface{}{}
@@ -20,6 +21,7 @@ func mapClaimsToInterface(mapClaims *jwt.MapClaims) *map[string]interface{} {
 	return &claims
 }
 
+// hasNonInteractiveScope checks for "sdk" or "service" prefixed scopes, as those are long lived tokens
 func hasNonInteractiveScope(mapClaims *jwt.MapClaims) bool {
 
 	claims := *mapClaims
@@ -32,7 +34,7 @@ func hasNonInteractiveScope(mapClaims *jwt.MapClaims) bool {
 
 		for _, scope := range scopes {
 
-			if strings.HasPrefix(scope, "sdk") {
+			if strings.HasPrefix(scope, "sdk") || strings.HasPrefix(scope, "service") {
 				return true
 			}
 		}
@@ -45,12 +47,15 @@ type jwtExchange struct {
 	oauth2Config *oauth2.Config
 }
 
+// sign a token with claims and scopes
 func (j *jwtExchange) sign(externalClaims *map[string]interface{}, scopes *[]string) (string, *map[string]interface{}) {
 
 	// Create jwt
 	token := jwt.New(jwt.SigningMethodHS256)
 
 	// Set claims
+	// NOTE: these should be set by the caller, retrieved from the valid oidc token
+	// https://openid.net/specs/openid-connect-core-1_0.html#rfc.section.2
 	claims := token.Claims.(jwt.MapClaims)
 	if externalClaims != nil {
 		for k, claim := range *externalClaims {
@@ -62,18 +67,12 @@ func (j *jwtExchange) sign(externalClaims *map[string]interface{}, scopes *[]str
 		claims["scopes"] = *scopes
 	}
 
-	// NOTE: these should be set by the caller, retrieved from the valid oidc token
-	// claims["iss"] = issuerID
-	// claims["aud"] = audience
-	// claims["jti"] = tokenId
-	// claims["sub"] = userId
-
 	now := time.Now()
 	claims["iat"] = now.Unix()
 
 	// Generate an appropriate expiry for this token
 	if hasNonInteractiveScope(&claims) {
-		claims["exp"] = now.AddDate(5, 0, 0).Unix() // 5 years for non interactive (sdk) tokens
+		claims["exp"] = now.AddDate(99, 0, 0).Unix() // 99 years for non interactive (sdk) tokens
 	} else {
 		claims["exp"] = now.AddDate(0, 0, 1).Unix() // 1 day for standard tokens
 	}
@@ -88,6 +87,7 @@ func (j *jwtExchange) sign(externalClaims *map[string]interface{}, scopes *[]str
 	return signed, mapClaimsToInterface(&claims)
 }
 
+// verify the token string is valid and signed by our systems
 func (j *jwtExchange) verify(token string) (*map[string]interface{}, error) {
 
 	claims := new(jwt.MapClaims)

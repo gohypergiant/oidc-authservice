@@ -11,8 +11,10 @@ import (
 type Roles = []string
 
 type Identity struct {
-	ID    string `json:"id"`
-	Roles Roles  `json:"roles"`
+	ID        string `json:"id"`
+	Roles     Roles  `json:"roles"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 }
 
 func getIdentityByEmail(svcUrl string, serviceToken string, idTokenHeader string, email string) *Identity {
